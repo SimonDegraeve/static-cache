@@ -42,25 +42,25 @@ module.exports = function staticCache(dir, options, files) {
     })
   }
 
-  return function* staticCache(next) {
+  return function staticCache(ctx, next) {
     // only accept HEAD and GET
-    if (this.method !== 'HEAD' && this.method !== 'GET') return yield next;
+    if (ctx.method !== 'HEAD' && ctx.method !== 'GET') return next();
 
     // decode for `/%E4%B8%AD%E6%96%87`
     // normalize for `//index`
-    var filename = safeDecodeURIComponent(path.normalize(this.path))
+    var filename = safeDecodeURIComponent(path.normalize(ctx.path))
 
     var file = files[filename]
 
     // try to load file
     if (!file) {
-      if (!options.dynamic) return yield next
-      if (path.basename(filename)[0] === '.') return yield next
+      if (!options.dynamic) return next()
+      if (path.basename(filename)[0] === '.') return next()
       if (filename.charAt(0) === path.sep) filename = filename.slice(1)
 
       // trim prefix
       if (options.prefix !== path.sep) {
-        if (filename.indexOf(filePrefix) !== 0) return yield next
+        if (filename.indexOf(filePrefix) !== 0) return next()
         filename = filename.slice(filePrefix.length)
       }
 
@@ -68,16 +68,16 @@ module.exports = function staticCache(dir, options, files) {
       try {
         s = yield fs.stat(path.join(dir, filename))
       } catch (err) {
-        return yield next
+        return next()
       }
-      if (!s.isFile()) return yield next
+      if (!s.isFile()) return next()
 
       file = loadFile(filename, dir, options, files)
     }
 
-    this.status = 200
+    ctx.status = 200
 
-    if (enableGzip) this.vary('Accept-Encoding')
+    if (enableGzip) ctx.vary('Accept-Encoding')
 
     if (!file.buffer) {
       var stats = yield fs.stat(file.path)
@@ -88,28 +88,28 @@ module.exports = function staticCache(dir, options, files) {
       }
     }
 
-    this.response.lastModified = file.mtime
-    if (file.md5) this.response.etag = file.md5
+    ctx.response.lastModified = file.mtime
+    if (file.md5) ctx.response.etag = file.md5
 
-    if (this.fresh)
-      return this.status = 304
+    if (ctx.fresh)
+      return ctx.status = 304
 
-    this.type = file.type
-    this.length = file.zipBuffer ? file.zipBuffer.length : file.length
-    this.set('Cache-Control', file.cacheControl || 'public, max-age=' + file.maxAge)
-    if (file.md5) this.set('Content-MD5', file.md5)
+    ctx.type = file.type
+    ctx.length = file.zipBuffer ? file.zipBuffer.length : file.length
+    ctx.set('Cache-Control', file.cacheControl || 'public, max-age=' + file.maxAge)
+    if (file.md5) ctx.set('Content-MD5', file.md5)
 
-    if (this.method === 'HEAD')
+    if (ctx.method === 'HEAD')
       return
 
-    var acceptGzip = this.acceptsEncodings('gzip') === 'gzip';
+    var acceptGzip = ctx.acceptsEncodings('gzip') === 'gzip';
 
     if (file.zipBuffer) {
       if (acceptGzip) {
-        this.set('Content-Encoding', 'gzip')
-        this.body = file.zipBuffer
+        ctx.set('Content-Encoding', 'gzip')
+        ctx.body = file.zipBuffer
       } else {
-        this.body = file.buffer
+        ctx.body = file.buffer
       }
       return
     }
@@ -128,10 +128,10 @@ module.exports = function staticCache(dir, options, files) {
         } else {
           file.zipBuffer = yield zlib.gzip(file.buffer)
         }
-        this.set('Content-Encoding', 'gzip')
-        this.body = file.zipBuffer
+        ctx.set('Content-Encoding', 'gzip')
+        ctx.body = file.zipBuffer
       } else {
-        this.body = file.buffer
+        ctx.body = file.buffer
       }
       return
     }
@@ -147,12 +147,12 @@ module.exports = function staticCache(dir, options, files) {
       })
     }
 
-    this.body = stream
+    ctx.body = stream
     // enable gzip will remove content length
     if (shouldGzip) {
-      this.remove('Content-Length')
-      this.set('Content-Encoding', 'gzip')
-      this.body = stream.pipe(zlib.createGzip())
+      ctx.remove('Content-Length')
+      ctx.set('Content-Encoding', 'gzip')
+      ctx.body = stream.pipe(zlib.createGzip())
     }
   }
 }
