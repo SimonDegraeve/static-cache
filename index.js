@@ -42,7 +42,7 @@ module.exports = function staticCache(dir, options, files) {
     })
   }
 
-  return function staticCache(ctx, next) {
+  return async function staticCache(ctx, next) {
     // only accept HEAD and GET
     if (ctx.method !== 'HEAD' && ctx.method !== 'GET') return next();
 
@@ -66,7 +66,7 @@ module.exports = function staticCache(dir, options, files) {
 
       var s
       try {
-        s = yield fs.stat(path.join(dir, filename))
+        s = await fs.stat(path.join(dir, filename))
       } catch (err) {
         return next()
       }
@@ -80,7 +80,7 @@ module.exports = function staticCache(dir, options, files) {
     if (enableGzip) ctx.vary('Accept-Encoding')
 
     if (!file.buffer) {
-      var stats = yield fs.stat(file.path)
+      var stats = await fs.stat(file.path)
       if (stats.mtime > file.mtime) {
         file.mtime = stats.mtime
         file.md5 = null
