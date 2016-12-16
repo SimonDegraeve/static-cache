@@ -126,7 +126,7 @@ module.exports = function staticCache(dir, options, files) {
         if (options.usePrecompiledGzip && gzFile && gzFile.buffer) { // if .gz file already read from disk
           file.zipBuffer = gzFile.buffer
         } else {
-          file.zipBuffer = yield zlib.gzip(file.buffer)
+          file.zipBuffer = await zlib.gzip(file.buffer)
         }
         ctx.set('Content-Encoding', 'gzip')
         ctx.body = file.zipBuffer
